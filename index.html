@@ -228,7 +228,7 @@
   const HEAD_START = 0, HEAD_END = 14;  // subtle drift for life
   // Longer than a marble-only pull-back: the span is now ~6 orders of magnitude,
   // so more seconds keep the felt zoom speed gentle and the recession unhurried.
-  let OUT_SECONDS = 62;         // let: shortened when the OS asks for reduced motion
+  let OUT_SECONDS = 40;         // let: nudged slightly shorter when the OS asks for reduced motion
   const EARTH_GONE_RANGE = 6.5e9; // camera range where Earth reads as gone (~2 px speck)
   const QUOTE_DELAY = 2000;     // ms after Earth vanishes before the quote fades in
 
@@ -551,7 +551,7 @@
 
   window.addEventListener("load", () => {
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      OUT_SECONDS = 24; // gentler, shorter flight
+      OUT_SECONDS = 34; // only slightly shorter, so devices stay consistent
     }
     if (!window.Cesium || !webglAvailable()) {
       el("loading").style.display = "none";
