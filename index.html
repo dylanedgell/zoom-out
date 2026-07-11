@@ -168,7 +168,7 @@
 
 <div id="cesiumContainer"></div>
 <div id="fade"></div>
-<button id="mute" title="Mute / unmute">♪</button>
+<button id="mute" title="Turn on sound">♪̷</button>
 
 <div id="intro" class="overlay show">
   <h1 class="title">Zoom Out</h1>
@@ -361,7 +361,7 @@
       pts.push(coll.add({
         position: pos,
         color: Cesium.Color.WHITE.withAlpha(0),
-        pixelSize: 1 + rnd() * 2.2,
+        pixelSize: 0.5 + rnd() * 1.1,
         scaleByDistance: new Cesium.NearFarScalar(1e8, 1.8, 8e9, 0.25),
       }));
       base.push(0.55 + rnd() * 0.45); // per-star brightness
@@ -445,11 +445,16 @@
     el("mute").classList.add("show");
   }
   el("mute").addEventListener("click", () => {
-    if (!audioCtx) return;
+    if (!audioCtx) {                       // first click turns the sound on
+      startDrone(); muted = false;
+      el("mute").textContent = "♪"; el("mute").title = "Mute";
+      return;
+    }
     muted = !muted;
     masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
     masterGain.gain.linearRampToValueAtTime(muted ? 0 : MASTER_LEVEL, audioCtx.currentTime + 0.8);
     el("mute").textContent = muted ? "♪̷" : "♪";
+    el("mute").title = muted ? "Turn on sound" : "Mute";
   });
 
   // ---- The flight ----------------------------------------------------------
@@ -492,7 +497,7 @@
     // Snap to the start framing while the screen is still black.
     viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(
       Cesium.Math.toRadians(HEAD_START), Cesium.Math.toRadians(PITCH_START), R_START));
-    startDrone();
+    el("mute").classList.add("show"); // sound starts OFF; the toggle lets them turn it on
     hide("intro");
     el("about").style.display = "none";
     el("aboutText").classList.remove("show");
