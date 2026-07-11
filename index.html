@@ -256,6 +256,7 @@
 
   // ---- State ---------------------------------------------------------------
   let viewer, scene, target = null, rafId = null, googleMode = false;
+  let starPoints = null, lastStarO = -1; // parallax near-star field + its last opacity
   const el = (id) => document.getElementById(id);
 
   // ---- Cesium init ---------------------------------------------------------
@@ -309,6 +310,8 @@
         new Cesium.Credit("Milky Way: ESO/S. Brunier · CC BY 4.0", false));
     } catch (e) { /* older Cesium API — attribution also in README */ }
 
+    addParallaxStars(); // finite-distance stars so the sky recedes with the pull-back
+
     if (GOOGLE_MAPS_KEY) {
       await enableGoogle3D();
     } else {
@@ -328,6 +331,47 @@
       addSatelliteImagery();
       googleMode = false;
     }
+  }
+
+  // ---- Parallax star field -------------------------------------------------
+  // The Milky Way skybox sits at infinity, so pulling the camera back doesn't move
+  // it — Earth shrinks against a frozen sky. Fix: scatter a few hundred stars at
+  // FINITE distances around Earth. Because they're near, they show real parallax —
+  // converging toward Earth and shrinking as you recede — so the whole scene reads
+  // as one continuous pull-back through space. They fade in only once you're well
+  // into space (kept off the low-altitude opening) and depth-test against Earth so
+  // ones behind it are correctly hidden.
+  function addParallaxStars() {
+    const coll = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+    const N = 480;
+    let s = 987654321; // seeded PRNG so the field is identical every run
+    const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+    const pts = [], base = [];
+    for (let i = 0; i < N; i++) {
+      const u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      const dir = new Cesium.Cartesian3(r * Math.cos(th), r * Math.sin(th), u);
+      const d = 3e7 * Math.pow(100, rnd()); // 3e7..3e9 m from Earth center, log-spread
+      const pos = Cesium.Cartesian3.multiplyByScalar(dir, d, new Cesium.Cartesian3());
+      pts.push(coll.add({
+        position: pos,
+        color: Cesium.Color.WHITE.withAlpha(0),
+        pixelSize: 1 + rnd() * 2.2,
+        scaleByDistance: new Cesium.NearFarScalar(1e8, 1.8, 8e9, 0.25),
+      }));
+      base.push(0.55 + rnd() * 0.45); // per-star brightness
+    }
+    starPoints = { pts, base };
+  }
+
+  // Fade the near-stars in across camera range ~1.2e7 → 1.2e8 m, then hold. Only
+  // touches the points while the opacity is actually changing (cheap).
+  function setStarOpacity(range) {
+    if (!starPoints) return;
+    const o = Math.min(1, Math.max(0, (range - 1.2e7) / 1.08e8));
+    if (Math.abs(o - lastStarO) < 0.01) return;
+    lastStarO = o;
+    const { pts, base } = starPoints;
+    for (let i = 0; i < pts.length; i++) pts[i].color = new Cesium.Color(1, 1, 1, base[i] * o);
   }
 
   // ---- Ambient pad (Web Audio, no files) -----------------------------------
@@ -418,6 +462,7 @@
       const pitch = Cesium.Math.toRadians(opts.fromP + (opts.toP - opts.fromP) * e);
       const head  = Cesium.Math.toRadians(opts.fromH + (opts.toH - opts.fromH) * e);
       viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(head, pitch, range));
+      setStarOpacity(range); // fade the parallax stars in as we climb into space
       // Fire the cue the moment Earth is gone — don't wait for the slow eased tail.
       if (!cued && opts.onCue && range >= opts.cueRange) { cued = true; opts.onCue(); }
       if (t < 1) rafId = requestAnimationFrame(tick);
@@ -461,6 +506,10 @@
   function reset() {                  // "New location"
     cancelAnimationFrame(rafId);
     hide("payoff");
+    if (starPoints) { // hide the near-stars again for the next run
+      starPoints.pts.forEach((p) => (p.color = Cesium.Color.WHITE.withAlpha(0)));
+      lastStarO = 0;
+    }
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY); // release the locked frame
     el("fade").style.opacity = "1";
     el("zip").value = "";
