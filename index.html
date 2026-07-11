@@ -229,7 +229,8 @@
   // Longer than a marble-only pull-back: the span is now ~6 orders of magnitude,
   // so more seconds keep the felt zoom speed gentle and the recession unhurried.
   let OUT_SECONDS = 62;         // let: shortened when the OS asks for reduced motion
-  const REST_BEAT = 2600;       // ms of just you and the stars before the quote fades in
+  const EARTH_GONE_RANGE = 6.5e9; // camera range where Earth reads as gone (~2 px speck)
+  const QUOTE_DELAY = 2000;     // ms after Earth vanishes before the quote fades in
 
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
   // Resolve once your location has ACTUALLY rendered (center pixel is no longer
@@ -416,6 +417,7 @@
     cancelAnimationFrame(rafId);
     const logFrom = Math.log(opts.fromR), logTo = Math.log(opts.toR);
     const t0 = performance.now();
+    let cued = false;
     (function tick(now) {
       let t = (now - t0) / (opts.seconds * 1000);
       if (t > 1) t = 1;
@@ -424,14 +426,17 @@
       const pitch = Cesium.Math.toRadians(opts.fromP + (opts.toP - opts.fromP) * e);
       const head  = Cesium.Math.toRadians(opts.fromH + (opts.toH - opts.fromH) * e);
       viewer.camera.lookAt(target, new Cesium.HeadingPitchRange(head, pitch, range));
+      // Fire the cue the moment Earth is gone — don't wait for the slow eased tail.
+      if (!cued && opts.onCue && range >= opts.cueRange) { cued = true; opts.onCue(); }
       if (t < 1) rafId = requestAnimationFrame(tick);
       else if (opts.onDone) opts.onDone();
     })(t0);
   }
 
-  function flyOut(onDone) {
+  function flyOut(onCue) {
     fly({ fromR: R_START, toR: R_END, fromP: PITCH_START, toP: PITCH_END,
-          fromH: HEAD_START, toH: HEAD_END, seconds: OUT_SECONDS, onDone });
+          fromH: HEAD_START, toH: HEAD_END, seconds: OUT_SECONDS,
+          cueRange: EARTH_GONE_RANGE, onCue });
   }
 
   // ---- Overlay helpers -----------------------------------------------------
@@ -453,10 +458,11 @@
     await waitForRendered(8000);
     el("fade").style.opacity = "0"; // fade the black away over your location
     await delay(1900);              // hold on your place for a breath
-    flyOut(async () => {
-      await delay(REST_BEAT);   // a beat of just you and the stars, then the words
-      setQuote("quote", "quoteAttr", QUOTES_OUT);
-      show("payoff");
+    flyOut(() => {              // onCue: fires when Earth vanishes
+      setTimeout(() => {
+        setQuote("quote", "quoteAttr", QUOTES_OUT);
+        show("payoff");
+      }, QUOTE_DELAY);
     });
   }
 
