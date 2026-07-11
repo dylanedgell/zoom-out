@@ -205,9 +205,14 @@
   "use strict";
 
   // ---- Copy ----------------------------------------------------------------
-  // A single line, shown in deep space once Earth has slipped away.
+  // Five lines, one picked at random each run, shown in deep space once Earth
+  // has slipped away.
   const QUOTES_OUT = [
-    { t: "Whatever you're carrying, you can set it down for a minute.", a: "" },
+    { t: "You are the sky. Everything else is just the weather.", a: "Pema Chödrön" },
+    { t: "Worry does not empty tomorrow of its sorrow. It empties today of its strength.", a: "Corrie ten Boom" },
+    { t: "Almost everything will work again if you unplug it for a few minutes, including you.", a: "Anne Lamott" },
+    { t: "Letting go gives us freedom, and freedom is the only condition for happiness.", a: "Thich Nhat Hanh" },
+    { t: "When we are no longer able to change a situation, we are challenged to change ourselves.", a: "Viktor Frankl" },
   ];
   const pickQuote = (arr) => arr[Math.floor(Math.random() * arr.length)];
   function setQuote(textId, attrId, arr) {
