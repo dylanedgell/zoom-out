@@ -331,11 +331,9 @@
   }
 
   // ---- Ambient pad (Web Audio, no files) -----------------------------------
-  // Warm-but-airy: an A-major-add9 chord voiced from a warm low root up to a
-  // quiet high shimmer, all pure sines, gently breathing, spread across stereo,
-  // and drenched in a generated convolution reverb so it feels weightless and
-  // spacious (the old sound was ominous because it droned on a 55 Hz sub-bass
-  // open fifth — low register + hollow interval reads as tension).
+  // Deep Warm Pad: a low C-major chord (65 Hz root up to G3) under a dark
+  // lowpass — no highs — with two detuned sines per note, gentle breathing, and
+  // a generated convolution reverb for warm, grounding space.
   let audioCtx = null, masterGain = null, muted = false;
   const MASTER_LEVEL = 0.5;
 
@@ -361,40 +359,31 @@
     limiter.threshold.value = -8; limiter.ratio.value = 6; limiter.attack.value = 0.02;
     masterGain.connect(limiter).connect(ctx.destination);
 
-    const tone = ctx.createBiquadFilter();          // soft warmth, not muffled
-    tone.type = "lowpass"; tone.frequency.value = 1900; tone.Q.value = 0.3;
+    const tone = ctx.createBiquadFilter();          // dark filter — warm, no highs
+    tone.type = "lowpass"; tone.frequency.value = 620; tone.Q.value = 0.3;
     tone.connect(masterGain);
 
-    const reverb = ctx.createConvolver();           // airy, weightless space
-    reverb.buffer = makeReverbImpulse(ctx, 5.5, 2.4);
-    const wet = ctx.createGain(); wet.gain.value = 0.65;
-    const dry = ctx.createGain(); dry.gain.value = 0.5;
+    const reverb = ctx.createConvolver();           // warm, grounding space
+    reverb.buffer = makeReverbImpulse(ctx, 5, 2.6);
+    const wet = ctx.createGain(); wet.gain.value = 0.5;
+    const dry = ctx.createGain(); dry.gain.value = 0.65;
     reverb.connect(wet).connect(tone);
     dry.connect(tone);
     const bus = ctx.createGain();                   // voices feed both dry + reverb
     bus.connect(dry); bus.connect(reverb);
 
-    // A major add9, warm root → open, airy top (Hz, gain, stereo pan)
-    const voices = [
-      { f: 110.00, g: 0.15, pan: -0.2 }, // A2  warm foundation
-      { f: 164.81, g: 0.12, pan:  0.2 }, // E3  fifth
-      { f: 220.00, g: 0.10, pan: -0.1 }, // A3
-      { f: 277.18, g: 0.08, pan:  0.15 },// C#4 major third (kept soft = warm)
-      { f: 329.63, g: 0.07, pan:  0.1 }, // E4
-      { f: 493.88, g: 0.045, pan: -0.15 },// B4 the 9th — openness
-      { f: 880.00, g: 0.022, pan:  0.0 },// A5 high shimmer (quiet air)
-    ];
-    voices.forEach((v, i) => {
-      const vg = ctx.createGain(); vg.gain.value = v.g;
-      const pan = ctx.createStereoPanner(); pan.pan.value = v.pan;
-      vg.connect(pan).connect(bus);
+    // Low C-major chord: C2 · G2 · C3 · E3 · G3 — warm and grounding, no highs
+    const notes = [65.41, 98.00, 130.81, 164.81, 196.00];
+    notes.forEach((f, i) => {
+      const vg = ctx.createGain(); vg.gain.value = 0.16 / (i + 1) + 0.04;
+      vg.connect(bus);
       const lfo = ctx.createOscillator();           // slow, gentle "breathing"
-      lfo.frequency.value = 0.03 + i * 0.011;
-      const lfoGain = ctx.createGain(); lfoGain.gain.value = v.g * 0.35;
+      lfo.frequency.value = 0.03 + i * 0.012;
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = vg.gain.value * 0.35;
       lfo.connect(lfoGain).connect(vg.gain); lfo.start();
-      [-3, 3].forEach((detune) => {                 // two detuned sines = lush width
+      [-3, 3].forEach((detune) => {                 // two detuned sines per note
         const o = ctx.createOscillator();
-        o.type = "sine"; o.frequency.value = v.f; o.detune.value = detune;
+        o.type = "sine"; o.frequency.value = f; o.detune.value = detune;
         o.connect(vg); o.start();
       });
     });
